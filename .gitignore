@@ -1,0 +1,25 @@
+# ChromaDB local vector store -- generated at runtime
+chroma_db/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+
+# Conda / virtual environments -- never push these
+.venv/
+env/
+*.egg-info/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# API keys -- critical, never push secrets
+.env
+*.env
+secrets.py
