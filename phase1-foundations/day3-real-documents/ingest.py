@@ -8,6 +8,11 @@ from loader import load_documents
 from chunker import chunk_semantic
 from rich import print
 from rich.progress import track
+import tiktoken
+
+def count_tokens(text: str) -> int:
+    enc = tiktoken.get_encoding("cl100k_base")
+    return len(enc.encode(text))
 
 def is_valid_chunk(chunk: str) -> bool:
     """
@@ -116,6 +121,13 @@ def ingest(documents_folder: str, chroma_path: str, collection_name: str):
             chunk_id += 1
 
     print(f"\n[bold]Total chunks to embed:[/bold] {len(all_chunks)}")
+
+    for chunk in all_chunks:
+        tokens = count_tokens(chunk)
+        if tokens > 256:
+            print(f"[yellow]Warning: chunk has {tokens} tokens, will be truncated[/yellow]")
+            print(f"  {chunk[:80]}...")
+
 
     # Embed in batches of 64
     batch_size = 64

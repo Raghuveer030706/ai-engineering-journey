@@ -33,10 +33,16 @@ def rag(question: str, n_results: int = 3) -> dict:
     distances = results["distances"][0]
     sources   = [m["source"] for m in results["metadatas"][0]]
 
-    context = "\n\n".join([f"[{i+1}] {c}" for i, c in enumerate(chunks)])
+    # Build context with source labels
+    context_parts = []
+    for i, (chunk, source) in enumerate(zip(chunks, sources)):
+        context_parts.append(f"[{i+1}] (source: {source})\n{chunk}")
+    context = "\n\n".join(context_parts)
 
     system_prompt = """You are a helpful assistant. Answer using ONLY the
-context provided. If the context is insufficient, say so clearly."""
+    context provided. Each chunk is labeled with its source.
+    When chunks from different sources conflict, prefer the academic paper
+    over personal notes. If the context is insufficient, say so clearly."""
 
     response = client_llm.messages.create(
         model="claude-haiku-4-5-20251001",
