@@ -95,3 +95,56 @@ Two questions retrieved from my_notes.txt instead of the paper
 despite the paper being the authoritative source.
 This is source competition -- multiple docs covering the same topic.
 Phase 2 will address this with metadata filtering and reranking.
+
+# Day 4 — HyDE (Hypothetical Document Embeddings)
+
+## What this builds
+Implements HyDE retrieval — generate a hypothetical answer,
+embed that instead of the raw question, retrieve with a
+richer, denser vector. Compares head-to-head against naive RAG.
+
+## Why HyDE works
+Questions and document chunks live in different parts of vector
+space. A hypothetical answer uses the same vocabulary and
+structure as real chunks — it lands geometrically closer to
+the right content.
+
+## Stack
+Same as Phase 1 + no new dependencies
+
+## Run order
+1. python ingest.py      — rebuild ChromaDB for Day 4
+2. python hyde.py        — HyDE retrieval with full output
+3. python compare.py     — naive vs HyDE side by side
+
+## Results
+| Method    | Hit rate | Notes                                        |
+|-----------|----------|----------------------------------------------|
+| Naive RAG | 6/6      | Wins on precise terminology questions        |
+| HyDE      | 6/6      | Wins on vague/short questions by distance    |
+
+## When HyDE wins
+- Vague questions where the raw question vector is weak
+- Questions where vocabulary differs from document language
+
+## When Naive wins
+- Questions containing exact terminology from the document
+- Short corpus where question-chunk vocabulary overlap is high
+
+## HyDE failure mode
+- LLM hypothesis drifts off topic → worse distance than naive
+- Fix: tighter system prompt constraining hypothesis to exact topic
+
+## Key insight
+HyDE doesn't change your embedding model or vector DB.
+It changes what you embed. That's the entire improvement.
+
+## Key production lesson — Day 4
+Q5 (layer normalisation) failed with both Naive and HyDE — dist 0.43+ for both.
+Root cause: corpus coverage gap. Paper mentions normalisation only in passing.
+Fix: added Ba et al. (2016) Layer Normalisation paper to document corpus.
+Result: Q5 distance dropped significantly after re-ingest.
+
+Rule: when both retrieval methods show high distance (>0.40),
+the problem is corpus coverage — not retrieval technique.
+Tune the corpus before tuning the retrieval.
