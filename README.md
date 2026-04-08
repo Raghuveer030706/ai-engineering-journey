@@ -244,3 +244,43 @@ Phase progression:
   Day 5 naive      (harder 8Q)        : 8/8
   Day 5 HyDE       (harder 8Q)        : 7/8
   Day 5 reranked   (harder 8Q)        : 8/8
+
+# Day 6 — RAGAS Evaluation
+
+## What this measures
+Four metrics your keyword harness cannot see:
+
+| Metric             | What it catches                          |
+|--------------------|------------------------------------------|
+| Faithfulness       | Hallucination — claims not in context    |
+| Answer relevancy   | Off-topic or incomplete answers          |
+| Context precision  | Noisy retrieval — irrelevant chunks      |
+| Context recall     | Missing chunks — incomplete context      |
+
+## Stack
+ragas, datasets, langchain-anthropic (new)
+everything else same as Phase 2
+
+## Run order
+1. python ingest.py     — rebuild collection for day6
+2. python ragas_eval.py — full RAGAS evaluation
+
+## Day 6 RAGAS baseline scores
+| Metric             | Score | Status        |
+|--------------------|-------|---------------|
+| Faithfulness       | 0.896 | Good          |
+| Answer relevancy   | 0.741 | Needs work    |
+| Context precision  | 0.667 | Needs work    |
+| Context recall     | 0.250 | Critical gap  |
+| Overall average    | 0.638 |               |
+
+## Key finding
+Context recall at 0.25 is the biggest gap.
+Retrieval is incomplete — correct chunks exist but aren't all surfacing.
+Fix: hybrid retrieval (Day 7) + wider n_wide.
+
+## What each score means
+Faithfulness 0.90 → Claude stays grounded in context 90% of the time.
+Answer relevancy 0.74 → Q4 optimizer question pulling average down.
+Context precision 0.67 → 1 in 3 retrieved chunks is noise.
+Context recall 0.25 → missing 75% of what complete answers need.
