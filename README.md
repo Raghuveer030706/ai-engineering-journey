@@ -173,8 +173,74 @@ all others same as Phase 1
 3. python compare.py   — 3-way comparison table
 
 ## Results
-| Method    | Hit rate | Notes                        |
-|-----------|----------|------------------------------|
-| Naive RAG | X/8      | fill in after compare.py     |
-| HyDE      | X/8      | fill in after compare.py     |
-| Reranked  | X/8      | fill in after compare.py     |
+Table 1 — Retrieval hit rate (does top-3 contain the right chunk?)
+YES = keyword found in top-3 results · NO = missed · rank shown when all hit
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                                       ┃              ┃ Naive      ┃ HyDE      ┃ Reranked     ┃                       ┃
+┃ Question                              ┃ Keyword      ┃ top-3 hit  ┃ top-3 hit ┃ top-3 hit    ┃ Verdict               ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━┩
+│ What is scaled dot-product attention? │ dot-product  │ YES (rank  │ YES (rank │ YES (rank 1) │ All retrieve          │
+│                                       │              │ 1)         │ 1)        │              │ correctly             │
+├───────────────────────────────────────┼──────────────┼────────────┼───────────┼──────────────┼───────────────────────┤
+│ How does multi-head attention work?   │ head         │ YES (rank  │ YES (rank │ YES (rank 1) │ All retrieve          │
+│                                       │              │ 1)         │ 1)        │              │ correctly             │
+├───────────────────────────────────────┼──────────────┼────────────┼───────────┼──────────────┼───────────────────────┤
+│ What is positional encoding?          │ position     │ YES (rank  │ YES (rank │ YES (rank 3) │ All retrieve          │
+│                                       │              │ 1)         │ 1)        │              │ correctly             │
+├───────────────────────────────────────┼──────────────┼────────────┼───────────┼──────────────┼───────────────────────┤
+│ What optimizer and parameters were    │ Adam         │ YES (rank  │ YES (rank │ YES (rank 3) │ All retrieve          │
+│ use                                   │              │ 3)         │ 2)        │              │ correctly             │
+├───────────────────────────────────────┼──────────────┼────────────┼───────────┼──────────────┼───────────────────────┤
+│ What is the role of layer             │ normalizati… │ YES (rank  │ NO        │ YES (rank 1) │ Mixed                 │
+│ normalisatio                          │              │ 1)         │           │              │                       │
+├───────────────────────────────────────┼──────────────┼────────────┼───────────┼──────────────┼───────────────────────┤
+│ How does the encoder-decoder          │ encoder      │ YES (rank  │ YES (rank │ YES (rank 7) │ All retrieve          │
+│ architect                             │              │ 1)         │ 1)        │              │ correctly             │
+├───────────────────────────────────────┼──────────────┼────────────┼───────────┼──────────────┼───────────────────────┤
+│ What were the BLEU scores on          │ BLEU         │ YES (rank  │ YES (rank │ YES (rank 1) │ All retrieve          │
+│ translati                             │              │ 1)         │ 1)        │              │ correctly             │
+├───────────────────────────────────────┼──────────────┼────────────┼───────────┼──────────────┼───────────────────────┤
+│ Why does the model use residual       │ residual     │ YES (rank  │ YES (rank │ YES (rank 1) │ All retrieve          │
+│ connec                                │              │ 1)         │ 1)        │              │ correctly             │
+└───────────────────────────────────────┴──────────────┴────────────┴───────────┴──────────────┴───────────────────────┘
+
+Hit rate summary:
+  Naive RAG  : 8/8 questions retrieved correctly in top-3
+  HyDE       : 7/8 questions retrieved correctly in top-3
+  Reranked   : 8/8 questions retrieved correctly in top-3
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Table 2 — Rank movement after reranking
+Shows where the correct chunk ranked BEFORE reranking vs AFTER.
+A jump from rank 5 → rank 1 is the reranker doing its job.
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃                                        ┃              ┃ Rank before    ┃ Rank after   ┃ Rerank     ┃                 ┃
+┃ Question                               ┃ Keyword      ┃ reranking      ┃ reranking    ┃ score      ┃ Movement        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ What is scaled dot-product attention?  │ dot-product  │ #1             │ #1           │ +8.06      │ No change       │
+├────────────────────────────────────────┼──────────────┼────────────────┼──────────────┼────────────┼─────────────────┤
+│ How does multi-head attention work?    │ head         │ #1             │ #1           │ +7.98      │ No change       │
+├────────────────────────────────────────┼──────────────┼────────────────┼──────────────┼────────────┼─────────────────┤
+│ What is positional encoding?           │ position     │ #1             │ #3           │ +6.43      │ ↓ -2 positions  │
+├────────────────────────────────────────┼──────────────┼────────────────┼──────────────┼────────────┼─────────────────┤
+│ What optimizer and parameters were use │ Adam         │ #3             │ #3           │ +0.40      │ No change       │
+├────────────────────────────────────────┼──────────────┼────────────────┼──────────────┼────────────┼─────────────────┤
+│ What is the role of layer normalisatio │ normalizati… │ #1             │ #1           │ +2.72      │ No change       │
+├────────────────────────────────────────┼──────────────┼────────────────┼──────────────┼────────────┼─────────────────┤
+│ How does the encoder-decoder architect │ encoder      │ #1             │ #7           │ +6.17      │ ↓ -6 positions  │
+├────────────────────────────────────────┼──────────────┼────────────────┼──────────────┼────────────┼─────────────────┤
+│ What were the BLEU scores on translati │ BLEU         │ #1             │ #1           │ -1.47      │ No change       │
+├────────────────────────────────────────┼──────────────┼────────────────┼──────────────┼────────────┼─────────────────┤
+│ Why does the model use residual connec │ residual     │ #1             │ #1           │ +6.71      │ No change       │
+└────────────────────────────────────────┴──────────────┴────────────────┴──────────────┴────────────┴─────────────────┘
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Phase progression:
+  Phase 1 baseline (naive, easy 6Q)  : 6/6   = 100%
+  Day 5 naive      (harder 8Q)        : 8/8
+  Day 5 HyDE       (harder 8Q)        : 7/8
+  Day 5 reranked   (harder 8Q)        : 8/8
