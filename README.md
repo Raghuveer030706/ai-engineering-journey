@@ -148,3 +148,33 @@ Result: Q5 distance dropped significantly after re-ingest.
 Rule: when both retrieval methods show high distance (>0.40),
 the problem is corpus coverage — not retrieval technique.
 Tune the corpus before tuning the retrieval.
+
+# Day 5 — Cross-encoder reranking
+
+## What this builds
+Adds a cross-encoder reranker to the retrieval pipeline.
+Retrieve top-10 by vector distance → rerank by relevance score → return top-3.
+Three-way comparison: Naive vs HyDE vs Reranked.
+
+## Why reranking works
+Bi-encoder: embed question independently, embed chunk independently, compare.
+Fast but approximate — doesn't see how question and chunk relate.
+
+Cross-encoder: read question + chunk together as one input.
+Scores true relevance. Slower but dramatically more precise.
+
+## Stack
+cross-encoder/ms-marco-MiniLM-L-6-v2 (new)
+all others same as Phase 1
+
+## Run order
+1. python ingest.py    — rebuild collection for day5
+2. python reranker.py  — full reranked RAG with output
+3. python compare.py   — 3-way comparison table
+
+## Results
+| Method    | Hit rate | Notes                        |
+|-----------|----------|------------------------------|
+| Naive RAG | X/8      | fill in after compare.py     |
+| HyDE      | X/8      | fill in after compare.py     |
+| Reranked  | X/8      | fill in after compare.py     |
