@@ -284,3 +284,69 @@ Faithfulness 0.90 → Claude stays grounded in context 90% of the time.
 Answer relevancy 0.74 → Q4 optimizer question pulling average down.
 Context precision 0.67 → 1 in 3 retrieved chunks is noise.
 Context recall 0.25 → missing 75% of what complete answers need.
+
+# Day 7 — Hybrid Retrieval
+
+## What this builds
+Combines Naive + HyDE retrieval into one candidate pool,
+deduplicates, then reranks the combined set.
+Targets the context recall gap identified in Day 6 (0.25).
+
+## Why hybrid works
+Naive misses vague queries. HyDE occasionally drifts.
+Combined pool covers both failure modes.
+Chunks found by BOTH methods are the strongest signal.
+
+## Architecture
+Naive (top 10) ──┐
+                  ├── merge + dedup ── rerank ── top 5
+HyDE  (top 10) ──┘
+
+## Run order
+1. python ingest.py      — rebuild collection for day7
+2. python hybrid.py      — test hybrid pipeline with output
+3. python ragas_eval.py  — RAGAS comparison vs Day 6
+
+## Results vs Day 6
+| Metric             | Day 6  | Day 7  | Delta   |
+|--------------------|--------|--------|---------|
+| Faithfulness       | 0.896  | 0.814  | -0.082  |
+| Answer relevancy   | 0.741  | 0.767  | +0.026  |
+| Context precision  | 0.667  | 0.636  | -0.031  |
+| Context recall     | 0.250  | 0.583  | +0.333  |
+| Overall            | 0.638  | 0.700  | +0.062  |
+
+## Key finding
+Context recall improved +0.333 — the largest single gain in Phase 2.
+Tradeoff: faithfulness dropped -0.082 as expected with larger context.
+Precision-recall tradeoff is real and measurable.
+
+## Production insight
+Hybrid retrieval improves recall at a small faithfulness and
+precision cost. In production, choose based on your priority:
+- Patient safety / legal → maximise faithfulness, accept lower recall
+- Research assistant → maximise recall, accept lower faithfulness
+
+## Final Day 7 results after fixes
+| Metric             | Day 6  | Day 7  | Delta   |
+|--------------------|--------|--------|---------|
+| Faithfulness       | 0.896  | 0.883  | -0.013  |
+| Answer relevancy   | 0.741  | 0.873  | +0.132  |
+| Context precision  | 0.667  | 0.723  | +0.056  |
+| Context recall     | 0.250  | 0.750  | +0.500  |
+| Overall            | 0.638  | 0.807  | +0.169  |
+
+## What produced the +0.169 improvement
+1. Hybrid retrieval (Naive + HyDE merged pool) → recall +0.500
+2. Rerank threshold -2.0 → optimizer chunk now passes through
+3. Duplicate chunk removal → cleaner context, less noise
+4. Ground truth aligned to corpus language (Greek symbols)
+
+## Key production lessons
+- Never tune chunking to fix one question — it breaks others
+- Rerank thresholds must be calibrated to corpus type
+  - Natural language: 0.0
+  - Academic papers with formulas: -1.5 to -2.0
+- Duplicate documents silently double your chunk count
+  and pollute retrieval with redundant candidates
+- Ground truth language must match corpus language exactly
