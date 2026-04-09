@@ -350,3 +350,42 @@ precision cost. In production, choose based on your priority:
 - Duplicate documents silently double your chunk count
   and pollute retrieval with redundant candidates
 - Ground truth language must match corpus language exactly
+
+
+# Day 8 — Query Expansion
+
+## What this builds
+Generates multiple reformulations of each question, retrieves
+candidates for each, merges all pools, deduplicates, reranks
+with the original question. Targets remaining recall gaps
+from Day 7 — specifically Q3 (positional encoding).
+
+## Why query expansion works
+Different vocabulary → different vector space regions →
+different chunks retrieved. Chunks found by 2+ query
+reformulations are the strongest retrieval signal.
+
+## Architecture
+Original query   ──┐
+Expansion 1      ──┼── retrieve (5 each) ── merge+dedup ── rerank ── top 5
+Expansion 2      ──┤
+Expansion 3      ──┘
+
+## Important distinction
+Expansions are for RETRIEVAL DIVERSITY only.
+Reranking always uses the ORIGINAL question.
+Never rerank with expanded queries — it introduces drift.
+
+## Run order
+1. python ingest.py      — rebuild collection for day8
+2. python expansion.py   — test with 4 questions, see expansions
+3. python ragas_eval.py  — full comparison vs Day 6 and Day 7
+
+## Results
+| Metric             | Day 6  | Day 7  | Day 8  | Total gain |
+|--------------------|--------|--------|--------|------------|
+| Faithfulness       | 0.896  | 0.883  | fill   |            |
+| Answer relevancy   | 0.741  | 0.873  | fill   |            |
+| Context precision  | 0.667  | 0.723  | fill   |            |
+| Context recall     | 0.250  | 0.750  | fill   |            |
+| Overall            | 0.638  | 0.807  | fill   |            |
