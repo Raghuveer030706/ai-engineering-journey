@@ -389,3 +389,47 @@ Never rerank with expanded queries — it introduces drift.
 | Context precision  | 0.667  | 0.723  | fill   |            |
 | Context recall     | 0.250  | 0.750  | fill   |            |
 | Overall            | 0.638  | 0.807  | fill   |            |
+
+# Day 9 — Phase 2 Capstone
+
+## What this builds
+The complete Phase 2 production pipeline combining the best
+elements from Days 4-8 into one clean, evaluated system.
+
+## Pipeline decisions
+- Hybrid retrieval (Day 7) as the primary strategy — best overall
+- Selective query expansion (Day 8) only when naive distance > 0.35
+- Cross-encoder reranking (Day 5) on combined candidate pool
+- Threshold -2.0 to handle academic paper mathematical notation
+
+## Why selective expansion
+Day 8 showed expansion hurts precision when naive retrieval
+is already confident (distance < 0.35). Expansion adds value
+only when retrieval signal is weak. Selective triggering
+preserves Day 7 precision while recovering Day 8 recall gains.
+
+# Day 9 — Phase 2 Capstone — COMPLETE
+
+## Final Phase 2 results
+| Metric             | Day 6  | Day 7  | Day 8  | Day 9  | Total gain |
+|--------------------|--------|--------|--------|--------|------------|
+| Faithfulness       | 0.896  | 0.883  | 0.755  | 0.924  | +0.028     |
+| Answer relevancy   | 0.741  | 0.873  | 0.772  | 0.926  | +0.185     |
+| Context precision  | 0.667  | 0.723  | 0.531  | 0.709  | +0.042     |
+| Context recall     | 0.250  | 0.750  | 0.750  | 0.750  | +0.500     |
+| Overall average    | 0.638  | 0.807  | 0.702  | 0.827  | +0.189     |
+
+## Phase 2 complete — 0.638 → 0.827
+
+## What selective expansion proved
+Triggering expansion only when naive distance > 0.35:
+- Preserved Day 7 precision (0.709 vs 0.723)
+- Maintained Day 7 recall (0.750)
+- Improved faithfulness to 0.924 — best across all days
+- Improved answer relevancy to 0.926 — best across all days
+
+## Known limitation
+Q3 (positional encoding) context recall = 0.00 across all days.
+Naive retrieval confident (distance < 0.35) but ground truth
+requires sinusoidal formula details not cleanly in any chunk.
+Lower threshold (0.30) or corpus expansion would fix this.
