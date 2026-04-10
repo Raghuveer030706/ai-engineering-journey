@@ -479,3 +479,74 @@ LLM calls  : 5
 
 Key finding: agent correctly inferred 8 heads × 64 dims = 512 = dmodel
 from RAG results without being told to make that connection.
+
+# Day 11 — Memory Systems for ReAct Agents
+
+## What was built
+Two-tier memory system integrated into the Day 10 ReAct agent.
+Short-term memory lives in RAM for the session.
+Long-term memory persists to SQLite across sessions.
+Both tiers exposed as agent tools so the LLM can read and write memory mid-reasoning.
+
+## Memory architecture
+Memory (facade)
+├── ShortTermMemory   — dict, RAM only, cleared on exit
+└── LongTermMemory    — SQLite (memory.db), survives sessions
+
+Unified retrieve() checks short-term first, falls back to long-term.
+store() writes to both tiers by default (persist=True).
+
+## Confidence scores
+Every memory entry carries a confidence float (0.0–1.0).
+Confidence degrades when RAG corpus contradicts a stored fact.
+Entries below threshold (default 0.6) are flagged ⚠ in the agent system prompt.
+low_confidence() returns all entries below threshold for re-verification.
+
+## Tools added to agent
+| Tool | Input format | Purpose |
+|---|---|---|
+| memory_store | key\|value\|confidence | Save a fact for future sessions |
+| memory_retrieve | key | Recall a previously stored fact |
+
+Total tools available to agent: calculator, dictionary, rag_search, memory_store, memory_retrieve
+
+## Test coverage
+- Short-term store and retrieve
+- Long-term store and retrieve
+- Confidence degradation
+- Low-confidence query
+- Unified facade (short-term wins on fresh store)
+- Context block generation
+
+## Key concepts
+
+### Why short-term before long-term in retrieve()
+Current session facts are always fresher than persisted facts.
+If the agent just stored something this session, that version wins.
+Prevents stale long-term memory poisoning a live reasoning chain.
+
+### Why persist=False exists
+Some reasoning is ephemeral — intermediate calc results, scratchpad notes.
+persist=False writes to short-term only, keeps SQLite clean.
+
+### Confidence degradation
+Protects against stale facts compounding across sessions.
+Example: memory stores "attention uses dot-product scoring" at conf=0.9.
+RAG returns chunk describing additive attention instead.
+Agent calls degrade("attention_mechanism", 0.2) → conf drops to 0.7.
+Next session the ⚠ flag prompts re-verification before use.
+
+### Memory injection at scale
+Injecting full memory context into every system prompt works for small stores.
+At hundreds of entries this bloats the context window and increases cost.
+Fix: vector-embed memory keys, retrieve only top-k relevant entries per query.
+This is memory RAG — Phase 4 territory.
+
+## Scores and counters
+- Phase 1 naive RAG keyword hit rate : 6/6 = 100%
+- Phase 2 RAGAS baseline Day 6       : 0.638
+- Phase 2 Day 7 hybrid               : 0.807
+- Phase 2 Day 9 capstone             : 0.827
+- Phase 3 Day 10 agent               : 3 tools, 4 steps, 5 LLM calls
+- Phase 3 Day 11 memory              : 2 memory tools, 5 total tools, SQLite persistence
+
