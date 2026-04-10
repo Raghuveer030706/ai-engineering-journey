@@ -433,3 +433,49 @@ Q3 (positional encoding) context recall = 0.00 across all days.
 Naive retrieval confident (distance < 0.35) but ground truth
 requires sinusoidal formula details not cleanly in any chunk.
 Lower threshold (0.30) or corpus expansion would fix this.
+
+# Day 10 — ReAct Agent From Scratch
+
+## What this builds
+A complete ReAct (Reasoning + Acting) loop in pure Python.
+No LangChain. No LlamaIndex. No agent framework.
+The LLM reasons, decides which tool to call, your code
+executes it, the observation feeds back — repeat until done.
+
+## Tools available
+- calculator  — evaluates math expressions locally
+- dictionary  — looks up AI/ML term definitions
+- rag_search  — searches Phase 2 ChromaDB knowledge base
+
+## The ReAct loop
+Thought → Action → Observation → Thought → ... → Final Answer
+
+## Why build without frameworks
+Frameworks hide the loop. When something breaks in production
+you need to know exactly which step failed — was it the
+tool call, the parser, the prompt format, or the LLM output?
+Building it yourself means you always know.
+
+## Run order
+1. python agent.py         — run 3 test questions, see full loop
+2. python inspect_agent.py — step-by-step trace table
+
+## Key numbers
+LLM calls per question: 1 per step + 1 for forced final if max reached
+Max steps default: 8
+Tools: 3 (calculator, dictionary, rag_search)
+
+## Verified trace results
+| Step | Type       | Tool       | Result              |
+|------|------------|------------|---------------------|
+| 1    | TOOL       | dictionary | attention definition|
+| 2    | TOOL       | rag_search | dk=dv=dmodel/h=64   |
+| 3    | TOOL       | calculator | 512                 |
+| 4    | FINAL      | —          | complete answer     |
+
+Tools used : 3
+Steps used : 4
+LLM calls  : 5
+
+Key finding: agent correctly inferred 8 heads × 64 dims = 512 = dmodel
+from RAG results without being told to make that connection.
