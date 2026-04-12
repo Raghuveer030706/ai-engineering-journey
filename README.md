@@ -542,11 +542,91 @@ At hundreds of entries this bloats the context window and increases cost.
 Fix: vector-embed memory keys, retrieve only top-k relevant entries per query.
 This is memory RAG — Phase 4 territory.
 
+# Day 12 — Multi-Agent Orchestration
+
+## What this builds
+Supervisor agent that routes questions to specialist sub-agents.
+Each specialist has a constrained tool set matching its domain.
+Supervisor synthesizes the specialist result into a clean final answer.
+Fixes the single-agent tool confusion problem from Day 11.
+
+## Architecture
+User question
+↓
+Supervisor — routes to correct specialist (1 LLM call)
+├── RAG agent    → rag_search + dictionary
+├── Math agent   → calculator only
+└── Memory agent → memory_store + memory_retrieve
+↓
+Supervisor synthesizes final answer (1 LLM call)
+
+## Stack
+Same as Day 11 — no new dependencies
+
+## Run order
+1. python test_routing.py   — verify routing only (cheap, 1 LLM call per case)
+2. python run.py            — full multi-agent run with 4 test questions
+
+## Routing logic
+| Question type | Agent routed |
+|---|---|
+| AI/ML concepts, research, technical knowledge | rag |
+| Arithmetic, calculations, numeric problems | math |
+| Store a fact, recall a stored fact | memory |
+
+## LLM calls per question
+| Stage | Calls |
+|---|---|
+| Router | 1 |
+| Specialist agent (avg 3 steps) | ~3 |
+| Synthesizer | 1 |
+| Total | ~5 |
+
+## Key findings
+
+### Why specialist agents have constrained tool sets
+Giving all tools to all agents causes tool confusion.
+A math agent with rag_search available may search the knowledge base
+instead of calculating — because the question mentions a familiar concept.
+Constrained tools force the right behaviour. Fewer tools = less ambiguity.
+
+### Why the synthesizer is a separate LLM call
+Specialist agents return answers in different formats and tones.
+Synthesizer normalises everything into one coherent user-facing answer.
+System prompt instructs: trust the agent result completely, do not question it.
+Without this instruction the synthesizer second-guesses valid agent answers.
+
+### Why router max_tokens=10
+Enforces the one-word constraint structurally, not just in the prompt.
+Without it the LLM ignores "one word only" and returns an explanation.
+
+## Bugs fixed
+Agent was writing Action + Final Answer in the same response without
+waiting for a real Observation. Parser accepted Final Answer, guard
+rejected it (no tools used), nudge fired, loop repeated until max steps.
+
+Fix 1: nudge message now explicitly says "do not write Final Answer yet"
+and shows only the tool call format.
+Fix 2: _base_rules() method added to BaseAgent, injected into all
+specialist system prompts. Rule: never write Action and Final Answer
+in the same response.
+
+Synthesizer was ignoring correct specialist results and generating
+its own response from scratch. Root cause: no system prompt grounding.
+Fix: explicit system prompt — "you are a result presenter, trust the
+agent result completely."
+
+## Limitation discovered
+Single-path routing cannot decompose multi-part questions.
+A question needing both RAG and Math gets sent to one agent only.
+The second part is never answered.
+Fix: planner layer — built in Day 13.
+
 ## Scores and counters
 - Phase 1 naive RAG keyword hit rate : 6/6 = 100%
 - Phase 2 RAGAS baseline Day 6       : 0.638
 - Phase 2 Day 7 hybrid               : 0.807
 - Phase 2 Day 9 capstone             : 0.827
 - Phase 3 Day 10 agent               : 3 tools, 4 steps, 5 LLM calls
-- Phase 3 Day 11 memory              : 2 memory tools, 5 total tools, SQLite persistence
-
+- Phase 3 Day 11 memory              : 2 memory tools, 5 total tools, SQLite
+- Phase 3 Day 12 multi-agent         : 3 specialists, ~5 LLM calls per question
