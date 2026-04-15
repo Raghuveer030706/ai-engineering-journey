@@ -630,3 +630,68 @@ Fix: planner layer — built in Day 13.
 - Phase 3 Day 10 agent               : 3 tools, 4 steps, 5 LLM calls
 - Phase 3 Day 11 memory              : 2 memory tools, 5 total tools, SQLite
 - Phase 3 Day 12 multi-agent         : 3 specialists, ~5 LLM calls per question
+
+
+# Day 14 — MCP Foundations
+
+## What this builds
+First MCP (Model Context Protocol) implementation from scratch.
+A local MCP server exposes two tools over the protocol.
+A public fetch MCP server reads URLs safely with no auth required.
+A unified MCP client routes tool calls to the correct server automatically.
+The Day 10 ReAct agent is rewired to call tools via MCP instead of
+hardcoded Python functions.
+
+## What MCP changes architecturally
+Day 10: tools were Python functions hardcoded inside the agent process.
+Day 14: tools are served by separate processes over a defined protocol.
+The agent never imports tool code directly — it discovers tools at runtime
+and calls them through the MCP client. Adding a new tool means adding a
+new server, not editing agent code.
+
+## Architecture
+LLM
+↓ tool call
+MCP Client (mcp_client.py)
+↓ routes automatically by tool name
+├── Local MCP server  (local_server.py — calculator + project_facts)
+└── Fetch MCP server  (uvx mcp-server-fetch — reads public URLs)
+↓ result
+MCP Client
+↓ observation
+LLM
+
+### Why MCP over hardcoded functions
+Hardcoded tools couple tool logic to agent code.
+MCP decouples them — tools live in separate processes, on separate machines,
+or on public servers. The agent discovers tools at runtime via list_tools().
+New tools require no agent code changes.
+
+### Tool discovery at runtime
+MCPClient.initialize() calls list_tools() on both servers before any
+question is asked. The agent builds its system prompt from discovered
+tool schemas — not from hardcoded strings. If a server adds a new tool,
+the agent picks it up automatically on next initialization.
+
+### Schema-aware argument inference
+When Action Input is not valid JSON, the parser falls back to raw string.
+The client reads the tool's actual input schema, takes the first required
+property name, and builds the correct argument dict automatically.
+fetch gets {"url": raw} — not {"expression": raw}.
+
+### Why a new connection per tool call
+Each call opens and closes a stdio connection to the server process.
+Tradeoff: slight overhead per call but no state management complexity.
+At Day 14 scale this is the right choice. Persistent connections add
+reconnect logic, heartbeats, and error recovery — not worth it yet.
+
+## Scores and counters
+- Phase 1 naive RAG keyword hit rate : 6/6 = 100%
+- Phase 2 RAGAS baseline Day 6       : 0.638
+- Phase 2 Day 7 hybrid               : 0.807
+- Phase 2 Day 9 capstone             : 0.827
+- Phase 3 Day 10 agent               : 3 tools, 4 steps, 5 LLM calls
+- Phase 3 Day 11 memory              : 2 memory tools, SQLite persistence
+- Phase 3 Day 12 multi-agent         : 3 specialists, ~5 LLM calls
+- Phase 3 Day 13 capstone            : planner, ~11 LLM calls
+- Phase 4 Day 14 MCP                 : 2 servers, 3 tools, runtime discovery
