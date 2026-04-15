@@ -631,6 +631,142 @@ Fix: planner layer — built in Day 13.
 - Phase 3 Day 11 memory              : 2 memory tools, 5 total tools, SQLite
 - Phase 3 Day 12 multi-agent         : 3 specialists, ~5 LLM calls per question
 
+# Day 13 — Phase 3 Capstone: Planner + Multi-Agent + Memory
+
+## What this builds
+Full multi-agent pipeline with task decomposition.
+Fixes the single-path routing limitation discovered on Day 12.
+A planner breaks complex questions into ordered sub-tasks.
+Each sub-task routes to the correct specialist agent independently.
+Prior results flow forward so later agents build on earlier outputs.
+A synthesizer merges all results into one clean final answer.
+Project facts ingested into ChromaDB so RAG agent can answer
+questions about the project itself.
+
+## Architecture
+User question
+↓
+Planner (LLM) — decomposes into ordered sub-tasks JSON
+↓
+Orchestrator — runs sub-tasks in order, injects context forward
+├── RAGAgent    (day12)
+├── MathAgent   (day12)
+└── MemoryAgent (day12 + day11)
+↓
+Synthesizer (LLM) — merges all results into final answer
+↓
+Memory — persists key facts to SQLite
+## Key design decisions
+
+### Why planner returns JSON
+Structured output forces the model to commit to a full plan
+before any agent runs. JSON is parseable and auditable.
+Planner retries once on JSON parse failure before falling back
+to a single rag task. Fail loudly rather than silently routing wrong.
+
+### Why context flows forward through sub-tasks
+Sub-task dependencies require prior results.
+Sub-task 1 retrieves Day 9 RAGAS score (0.827).
+Sub-task 2 multiplies it by 100.
+Without context injection the math agent has no number to work with.
+Orchestrator injects accumulated results into each subsequent task string.
+Failed sub-tasks are filtered out so error strings don't poison
+downstream reasoning.
+
+### rag vs memory routing rule
+Use rag for facts, concepts, scores from documents.
+Use memory only when question says "recall", "retrieve from memory",
+or references a previously saved key.
+Never use memory to answer factual questions — those always go to rag.
+
+### Why synthesizer needs a system prompt
+Without a system prompt the synthesizer defaults to general assistant
+behaviour — it hedges and ignores correct agent results.
+One sentence fixes it: "You are a result presenter. Trust the agent
+result completely. Do not question it."
+
+### Why this architecture is not always the right choice
+Planner + orchestrator + synthesizer adds minimum 3 extra LLM calls.
+For simple single-domain questions this overhead is unjustified.
+A plain ReAct loop is faster and cheaper.
+Use the planner only when questions are reliably multi-part
+and multi-domain. Architecture complexity must be earned.
+
+## Decomposition patterns tested
+| Pattern | Agents | Total LLM calls |
+|---|---|---|
+| Single domain | rag only | ~5 |
+| Knowledge + math | rag + math | ~8 |
+| Knowledge + math + memory | rag + math + memory | ~11 |
+| Memory recall | memory only | ~5 |
+
+## LLM call breakdown — three-agent question
+| Stage | Calls |
+|---|---|
+| Planner | 1 |
+| RAG agent (~3 steps) | 3 |
+| Math agent (~3 steps) | 3 |
+| Memory agent (~3 steps) | 3 |
+| Synthesizer | 1 |
+| Total | 11 |
+
+## Bugs fixed during Day 13
+
+### Corpus gap — root cause of all factual failures
+RAG agent searched the Attention Is All You Need paper for questions
+about Day 3 chunk counts and Phase 2 RAGAS scores.
+Returned chunks about Adam optimizers and BLEU scores.
+Root cause: that information was never ingested.
+Fix: ingest_project_docs.py embeds 12 project fact chunks into the
+existing day9 collection using relative paths so it works on any machine.
+
+### Planner routing rag vs memory confusion
+Planner was routing "what was the Phase 2 score" to memory instead of rag.
+Root cause: vague agent descriptions in the planner prompt.
+Fix: explicit rules — use rag for document facts, use memory only when
+question explicitly references a previously saved key.
+
+### Max-steps error string poisoning context
+When an agent failed and returned "reached max steps", the orchestrator
+passed that string as context into the next sub-task.
+The next agent reasoned from an error message as if it were a fact.
+Fix: orchestrator filters failed results before injecting context forward.
+
+### Hardcoded paths
+Absolute paths with drive letters and usernames break on every other machine.
+Fix: Path(__file__).parent resolves relative to the script location.
+Works on Windows, Mac, and Linux without any environment-specific strings.
+
+## Project facts ingested (ingest_project_docs.py)
+12 chunks covering: Day 3 chunk counts, RAGAS scores by day,
+Phase 2 gain calculation, cross-encoder reranking, HyDE, hybrid retrieval,
+semantic chunking, Day 10 agent trace, Day 11 memory system,
+selective expansion, Phase 2 complete metrics.
+
+ChromaDB path resolved with Path(__file__).parent — no hardcoded paths.
+All chunks upserted with source="project_notes" metadata.
+
+## Reuses
+- phase3-agents/day12-multi-agent/agents/ — RAGAgent, MathAgent,
+  MemoryAgent, BaseAgent
+- phase3-agents/day11-memory/memory.py — Memory facade, SQLite
+
+## Phase 3 complete scores
+| Day | System | Result |
+|---|---|---|
+| Day 10 | ReAct agent | 3 tools, 4 steps, 5 LLM calls |
+| Day 11 | Memory | Short + long term, SQLite, confidence scores |
+| Day 12 | Multi-agent | Supervisor + 3 specialists, ~5 LLM calls |
+| Day 13 | Capstone | Planner, multi-path routing, ~11 LLM calls |
+
+## Key lessons from Day 13
+1. The RAG agent retrieves only what was ingested — project knowledge
+   must be explicitly added to the corpus
+2. Planner prompt rules must be explicit — vague agent descriptions
+   produce wrong routing
+3. Failed sub-task results must be filtered before context injection
+4. Synthesizer must be grounded with a system prompt or it hedges
+5. Use relative paths in every script pushed to GitHub
 
 # Day 14 — MCP Foundations
 
