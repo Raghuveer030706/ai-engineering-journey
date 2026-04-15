@@ -685,6 +685,15 @@ Tradeoff: slight overhead per call but no state management complexity.
 At Day 14 scale this is the right choice. Persistent connections add
 reconnect logic, heartbeats, and error recovery — not worth it yet.
 
+### Fetch server (public — uvx mcp-server-fetch)
+| Tool | Input | Purpose |
+|---|---|---|
+| fetch | {"url": "..."} | Read content from any public URL |
+
+Fetch is safe because it reads public URLs only — no filesystem access,
+no credentials, no auth tokens required. Results truncated to 2000 chars
+to prevent context window bloat.
+
 ## Scores and counters
 - Phase 1 naive RAG keyword hit rate : 6/6 = 100%
 - Phase 2 RAGAS baseline Day 6       : 0.638
