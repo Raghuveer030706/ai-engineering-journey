@@ -840,3 +840,109 @@ to prevent context window bloat.
 - Phase 3 Day 12 multi-agent         : 3 specialists, ~5 LLM calls
 - Phase 3 Day 13 capstone            : planner, ~11 LLM calls
 - Phase 4 Day 14 MCP                 : 2 servers, 3 tools, runtime discovery
+
+# Day 15 — Multi-Agent System on MCP
+
+## What this builds
+Day 12 multi-agent system fully rewired to use MCP protocol.
+Specialist agents no longer import Python tool functions directly.
+All tool calls go through the MCP client to the local MCP server.
+Tools are discovered at runtime via list_tools() — not hardcoded.
+New local server exposes 5 tools: calculator, project_facts,
+rag_search, memory_store, memory_retrieve.
+
+## What changes from Day 12
+Day 12: BaseAgent took a tools dict of Python functions.
+         Adding a tool meant editing agent code.
+Day 15: BaseAgent takes an MCPClient instance.
+         Adding a tool means adding it to the MCP server only.
+         Agent discovers it automatically at next initialization.
+
+## Architecture
+User question
+↓
+Supervisor — routes to correct specialist (1 LLM call, max_tokens=10)
+├── RAG agent    → MCP → rag_search, project_facts
+├── Math agent   → MCP → calculator
+└── Memory agent → MCP → memory_store, memory_retrieve
+↓
+Supervisor synthesizes final answer (1 LLM call)
+
+## Tools served by local MCP server
+
+| Tool | Input schema | Purpose | Agent |
+|---|---|---|---|
+| calculator | {"expression": "..."} | Safe math eval | Math |
+| project_facts | {"key": "..."} | Project scores and facts | RAG |
+| rag_search | {"query": "..."} | ChromaDB semantic search | RAG |
+| memory_store | {"entry": "key\|value\|conf"} | Persist a fact to SQLite | Memory |
+| memory_retrieve | {"key": "..."} | Recall a stored fact | Memory |
+
+## Specialist agent tool sets
+
+| Agent | Allowed tools | Purpose |
+|---|---|---|
+| RAGAgent | rag_search, project_facts | Knowledge base questions |
+| MathAgent | calculator | Calculations |
+| MemoryAgent | memory_store, memory_retrieve | Store and recall facts |
+
+## Key design decisions
+
+### Why BaseAgent takes MCPClient not a tools dict
+Day 12 tools dict couples tool logic to agent code.
+MCPClient decouples them — agent calls tools over the protocol.
+New tools require server changes only. Agent code never changes.
+Tools are discovered at runtime via mcp.initialize() not at import.
+
+### Why ChromaDB and embedding model load at server startup
+Loading SentenceTransformer takes 2-5 seconds.
+Loading at startup means every rag_search call is fast.
+Loading inside call_tool() per request would add 3-6 seconds
+of setup overhead to every single search call.
+Tradeoff: memory held for server lifetime even with no queries.
+
+### Why specialist agents are created fresh per question
+Memory agent system prompt includes current memory state
+via _memory.context_block(). Creating once at startup would
+freeze that context at initialization time. Fresh instances
+guarantee system prompt reflects current session state.
+
+### Why allowed_tools check exists in BaseAgent
+Without it any agent could call any tool on the MCP server.
+A math agent with rag_search available may search the knowledge
+base instead of calculating — tool confusion from Day 12.
+The allowed_tools list enforces specialist boundaries.
+Constraint is intentional, not a limitation.
+
+### Why _memory instance is shared across all server calls
+Shared instance enables facts stored in one call to be
+retrieved in the next call within the same server session.
+Risk: race condition if two questions trigger memory_store
+simultaneously. SQLite concurrent writes can cause a
+"database is locked" error. Fix: write lock or SQLite WAL mode.
+
+## Routing logic
+Same rules as Day 12:
+- rag: AI/ML concepts, research, technical knowledge, project scores
+- math: arithmetic, calculations, numeric problems
+- memory: store a fact, recall a previously stored fact
+
+## LLM calls per question
+| Stage | Calls |
+|---|---|
+| Router | 1 |
+| Specialist agent (avg 3 steps) | ~3 |
+| Synthesizer | 1 |
+| Total | ~5 |
+
+## Scores and counters
+- Phase 1 naive RAG keyword hit rate : 6/6 = 100%
+- Phase 2 RAGAS baseline Day 6       : 0.638
+- Phase 2 Day 7 hybrid               : 0.807
+- Phase 2 Day 9 capstone             : 0.827
+- Phase 3 Day 10 agent               : 3 tools, 4 steps, 5 LLM calls
+- Phase 3 Day 11 memory              : 2 memory tools, SQLite persistence
+- Phase 3 Day 12 multi-agent         : 3 specialists, ~5 LLM calls
+- Phase 3 Day 13 capstone            : planner, ~11 LLM calls
+- Phase 4 Day 14 MCP                 : 2 servers, 3 tools, runtime discovery
+- Phase 4 Day 15 MCP multi-agent     : 5 tools, 3 specialists, all via MCP
