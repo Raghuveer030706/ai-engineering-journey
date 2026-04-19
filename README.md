@@ -935,14 +935,31 @@ Same rules as Day 12:
 | Synthesizer | 1 |
 | Total | ~5 |
 
-## Scores and counters
-- Phase 1 naive RAG keyword hit rate : 6/6 = 100%
-- Phase 2 RAGAS baseline Day 6       : 0.638
-- Phase 2 Day 7 hybrid               : 0.807
-- Phase 2 Day 9 capstone             : 0.827
-- Phase 3 Day 10 agent               : 3 tools, 4 steps, 5 LLM calls
-- Phase 3 Day 11 memory              : 2 memory tools, SQLite persistence
-- Phase 3 Day 12 multi-agent         : 3 specialists, ~5 LLM calls
-- Phase 3 Day 13 capstone            : planner, ~11 LLM calls
-- Phase 4 Day 14 MCP                 : 2 servers, 3 tools, runtime discovery
-- Phase 4 Day 15 MCP multi-agent     : 5 tools, 3 specialists, all via MCP
+# Day 16 — Phase 4 Capstone: Planner + MCP Multi-Agent
+
+## What this builds
+Full multi-agent pipeline with task decomposition, all tool calls
+via MCP protocol. Connects every system built across 16 days.
+Day 13 planner decomposes questions into ordered sub-tasks.
+Day 15 MCP agents handle each sub-task via the protocol.
+New fetch specialist reads live public URLs.
+Synthesizer merges all results into one clean final answer.
+
+## What is new vs Day 13
+Day 13 agents called hardcoded Python functions.
+Day 16 agents call all tools via MCPClient → local MCP server.
+Day 16 adds a fourth specialist: FetchAgent (allowed_tools=["fetch"]).
+Planner handles four agent types: rag, math, memory, fetch.
+
+## Architecture
+User question
+↓
+Planner (LLM) — JSON ordered sub-tasks
+↓
+Orchestrator — runs sub-tasks in order
+├── RAG agent    → MCP → rag_search, project_facts
+├── Math agent   → MCP → calculator
+├── Memory agent → MCP → memory_store, memory_retrieve
+└── Fetch agent  → MCP → fetch (live URLs)
+↓ context flows forward, failed results filtered
+Synthesizer — one clean final answer

@@ -2,3 +2,4 @@
 from .rag_agent import RAGAgent
 from .math_agent import MathAgent
 from .memory_agent import MemoryAgent
+from .fetch_agent import FetchAgent
