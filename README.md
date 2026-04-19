@@ -963,3 +963,107 @@ Orchestrator — runs sub-tasks in order
 └── Fetch agent  → MCP → fetch (live URLs)
 ↓ context flows forward, failed results filtered
 Synthesizer — one clean final answer
+
+## Decomposition patterns tested
+| Pattern | Agents | Total LLM calls |
+|---|---|---|
+| Single domain | rag only | ~5 |
+| Knowledge + math | rag + math | ~8 |
+| Knowledge + math + memory | rag + math + memory | ~11 |
+| All four specialists | rag + math + memory + fetch | ~14 |
+| Memory recall | memory only | ~5 |
+
+## LLM call breakdown — four-agent question
+| Stage | Calls |
+|---|---|
+| Planner | 1 |
+| RAG agent (~3 steps) | 3 |
+| Math agent (~3 steps) | 3 |
+| Memory agent (~3 steps) | 3 |
+| Fetch agent (~3 steps) | 3 |
+| Synthesizer | 1 |
+| Total | ~14 |
+
+## Key design decisions
+
+### Why fetch is a separate specialist
+Tool confusion. A RAG agent with fetch available may fetch a URL
+instead of searching ChromaDB — because the question mentions a
+topic it recognises. Single-tool specialists force correct behaviour.
+The fetch agent only has one tool so it always uses it correctly.
+
+### Why context flows forward through sub-tasks
+Sub-task dependencies require prior results.
+Sub-task 1 retrieves RAGAS score (0.827).
+Sub-task 2 multiplies it by 100.
+Without injection the math agent has no number to work with.
+Orchestrator injects only successful results — failed results
+are filtered before context injection.
+
+### Why synthesizer filters failed sub-tasks
+Synthesizer trusts agent results completely by design.
+If failed results are included it presents error strings as answers.
+Filter failures before building the results block — synthesizer
+only sees real content from successful sub-tasks.
+
+### Why the planner needs an explicit fetch rule
+Without "use fetch ONLY when a specific URL is referenced" the
+planner routes general research questions to fetch instead of rag.
+Fetch reads a public homepage and returns generic content instead
+of project-specific facts from ChromaDB.
+
+### When this architecture is overkill
+~14 LLM calls for a 4-agent question is significant overhead.
+Justified only when the question genuinely needs four specialists.
+For single-domain questions a plain ReAct loop handles it in ~5
+calls. Architecture complexity must be earned.
+
+## Gotchas learned
+Failed sub-task results must be filtered before context injection.
+Error strings passed as context get treated as facts by the next
+agent — the math agent reasons from an error message instead of
+a real score.
+
+Planner must have an explicit fetch constraint or it routes
+general questions to fetch instead of rag, returning homepage
+content instead of knowledge base facts.
+
+## Phase 4 complete scores
+| Day | System | Result |
+|---|---|---|
+| Day 14 | MCP foundations | 2 servers, 3 tools, runtime discovery |
+| Day 15 | MCP multi-agent | 5 tools, 3 specialists, all via MCP |
+| Day 16 | Phase 4 capstone | 4 specialists, ~14 LLM calls, 16-day stack |
+
+## Full journey scores
+- Phase 1 naive RAG keyword hit rate : 6/6 = 100%
+- Phase 2 RAGAS baseline Day 6       : 0.638
+- Phase 2 Day 7 hybrid               : 0.807
+- Phase 2 Day 9 capstone             : 0.827
+- Phase 3 Day 10 agent               : 3 tools, 4 steps, 5 LLM calls
+- Phase 3 Day 13 capstone            : planner, ~11 LLM calls
+- Phase 4 Day 14 MCP                 : runtime tool discovery
+- Phase 4 Day 15 MCP multi-agent     : 5 tools, all via protocol
+- Phase 4 Day 16 capstone            : 4 specialists, ~14 LLM calls
+
+## Key lesson from Phase 4
+Adding a tool in Phase 3 meant editing agent code.
+Adding a tool in Phase 4 means editing the MCP server.
+The agent discovers it automatically at next initialization.
+That decoupling is the entire architectural benefit of MCP.
+
+## Files
+| File | Purpose |
+|---|---|
+| planner.py | Decomposes question into ordered sub-tasks JSON |
+| orchestrator.py | Runs sub-tasks, filters failures, injects context |
+| synthesizer.py | Merges successful results into final answer |
+| run.py | Entry point with 5 test questions |
+| test_planner.py | Verifies decomposition without running agents |
+| README.md | This file |
+| ../day15/agents/fetch_agent.py | Fetch specialist added for Day 16 |
+
+## What comes next
+Phase 5 — Capstone system (Days 17–20)
+Production-grade HTTP API serving the full 16-day stack.
+FastAPI wrapper, retry logic, cost tracking, RAGAS eval end to end.
