@@ -207,3 +207,8 @@ class Memory:
     def context_block(self) -> str:
         """Full memory context injected into agent system prompt."""
         return self.short.summary() + "\n\n" + self.long.summary()
+    
+    def count(self) -> int:
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute("SELECT COUNT(*) FROM memory").fetchone()
+            return row[0] if row else 0
